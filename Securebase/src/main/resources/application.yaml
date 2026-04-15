@@ -1,3 +1,13 @@
 spring:
   application:
     name: Securebase
+
+  datasource:
+    url: "jdbc:postgresql://localhost:5432/securebase_db"
+    username: "admin"
+    password: "admin"
+
+  jpa:
+   hibernate:
+     ddl-auto: update # Options: create, create-drop, update, validate, none
+   show-sql: true
