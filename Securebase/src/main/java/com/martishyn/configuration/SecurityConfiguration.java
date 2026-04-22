@@ -25,11 +25,15 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfiguration {
 
 
+    //The service that calls the library to issue a token on login, and to extract claims from it
+    //The filter that intercepts requests, pulls the token from the header, and calls your service to validate it
+    //The controller logic that triggers token issuance after successful credential check
+
     @Bean
     @Order(1)
     public SecurityFilterChain securityFilterChain(HttpSecurity http)  {
         final HttpSecurity httpSecurity =
-                http.securityMatcher("/register")
+                http.securityMatcher("/register", "/login")
                         .authorizeHttpRequests(auth -> {
                     auth.anyRequest().authenticated();
                 })
@@ -37,16 +41,6 @@ public class SecurityConfiguration {
                         .httpBasic(Customizer.withDefaults());
         return httpSecurity.build();
     }
-
-//    @Bean
-//    public SecurityFilterChain formLoginFilterChain(HttpSecurity http) throws Exception {
-//        http
-//                .authorizeHttpRequests((authorize) -> authorize
-//                        .anyRequest().authenticated()
-//                )
-//                .formLogin(Customizer.withDefaults());
-//        return http.build();
-//    }
 
     @Bean
     public AuthenticationManager authenticationManager(PasswordEncoder passwordEncoder, UserDetailsService userDetailsService) {

@@ -1,5 +1,6 @@
 package com.martishyn.auth;
 
+import com.martishyn.auth.jwt.JwtService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,9 +14,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class AuthController {
 
     private final UserAuthService userAuthService;
+    private final JwtService jwtService;
 
-    public AuthController(UserAuthService userAuthService) {
+    public AuthController(UserAuthService userAuthService, JwtService jwtService) {
         this.userAuthService = userAuthService;
+        this.jwtService = jwtService;
     }
 
     @PostMapping("/register")
@@ -27,9 +30,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> authUser(@RequestBody LoginUserDto loginUserDto) {
-
-        //return jwt token on logic?
-        return ResponseEntity.ok("token");
+        final String jwtToken = userAuthService.loginUser(loginUserDto);
+        return ResponseEntity.ok(jwtToken);
     }
-
 }
