@@ -1,5 +1,7 @@
 package com.martishyn.auth;
 
+import com.martishyn.auth.db.Role;
+import com.martishyn.auth.db.RoleRepository;
 import com.martishyn.auth.db.User;
 import com.martishyn.auth.db.UserAuthRepository;
 import com.martishyn.auth.jwt.JwtService;
@@ -7,15 +9,23 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
 @Service
 public class UserAuthService {
 
     private final UserAuthRepository userAuthRepository;
+    private final RoleRepository roleRepository;
+
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    public UserAuthService(UserAuthRepository userAuthRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
+    public UserAuthService(UserAuthRepository userAuthRepository,
+                           RoleRepository roleRepository,
+                           PasswordEncoder passwordEncoder,
+                           JwtService jwtService) {
         this.userAuthRepository = userAuthRepository;
+        this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -24,6 +34,8 @@ public class UserAuthService {
     public void registerNewUser(RegisterNewUserDto registerNewUserDto){
         String encodedPassword = passwordEncoder.encode(registerNewUserDto.password());
         User user = new User(registerNewUserDto.email(), encodedPassword);
+        Role customerRole = roleRepository.findRoleByRoleName("ROLE_CUSTOMER");
+        user.addRole(customerRole);
         userAuthRepository.save(user);
     }
 
@@ -32,7 +44,7 @@ public class UserAuthService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
         final String enteredPassword = loginUserDto.password();
         final String encodedPassword = passwordEncoder.encode(enteredPassword);
-        if (!encodedPassword.equals(encodedPassword)) {
+        if (!passwordEncoder.matches(enteredPassword, encodedPassword)){
             throw new RuntimeException("Passwords do not match");
         }
         final String jwtToken = jwtService.issueToken(userByEmail);

@@ -12,7 +12,7 @@ export class HomeComponent {
 
   email = ''
 
-  private constructor(private authService: AuthService, private router: Router) {
+  constructor(private authService: AuthService, private router: Router) {
     var token = authService.getToken();
     if (token != null) {
       const claims = jwtDecode<{sub : string}>(token);

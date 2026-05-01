@@ -14,11 +14,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class AuthController {
 
     private final UserAuthService userAuthService;
-    private final JwtService jwtService;
 
-    public AuthController(UserAuthService userAuthService, JwtService jwtService) {
+    public AuthController(UserAuthService userAuthService) {
         this.userAuthService = userAuthService;
-        this.jwtService = jwtService;
     }
 
     @PostMapping("/register")

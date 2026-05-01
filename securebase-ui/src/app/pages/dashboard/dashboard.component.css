@@ -1,0 +1,29 @@
+.dashboard {
+  padding: 2rem;
+}
+
+.cards {
+  display: flex;
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.card {
+  flex: 1;
+  padding: 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.card h3 {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #888;
+}
+
+.card.danger {
+  border-color: #e74c3c;
+  background: #fff5f5;
+}
