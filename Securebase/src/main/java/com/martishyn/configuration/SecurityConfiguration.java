@@ -3,7 +3,6 @@ package com.martishyn.configuration;
 import com.martishyn.auth.jwt.JwtFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -18,7 +17,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -38,7 +36,7 @@ public class SecurityConfiguration {
                         .cors(Customizer.withDefaults())
                         .sessionManagement(httpSecuritySessionManagementConfigurer -> httpSecuritySessionManagementConfigurer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                         .securityMatcher("/api/v1/**")
-                        .addFilterAt(jwtFilter, BasicAuthenticationFilter.class)
+                        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                         .authorizeHttpRequests(authorizeRequests -> {
                             authorizeRequests.requestMatchers("/api/v1/login", "/api/v1/home", "/api/v1/register").permitAll();
                             authorizeRequests.anyRequest().authenticated();

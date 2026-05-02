@@ -1,6 +1,7 @@
 import {Component, OnInit} from '@angular/core';
 import {jwtDecode} from 'jwt-decode';
 import {AuthService} from '../../services/auth.service';
+import {DashboardService} from '../../services/dashboard.service';
 import {Router} from '@angular/router';
 import {NgIf} from '@angular/common';
 
@@ -21,6 +22,7 @@ interface JwtClaims {
 })
 
 export class DashboardComponent implements OnInit {
+  currentRoles ='';
   email = '';
   issuer = '';
   issuedAt = '';
@@ -31,11 +33,20 @@ export class DashboardComponent implements OnInit {
   private timer: any;
 
 
-  constructor(private authService: AuthService, private router: Router) {
+  constructor(private authService: AuthService, private router: Router, private dashboardService: DashboardService) {
 
   }
 
   ngOnInit() {
+    this.dashboardService.getRolesInfoFromDashBoard()
+      .subscribe( {
+        next: (returnedRoles) => {
+          this.currentRoles = returnedRoles.toString()
+          console.log(this.currentRoles);
+        },
+        error: (error) => {console.log(error)}
+      })
+
     const token = this.authService.getToken();
     if (!token) {
       this.router.navigate(['/login']);
