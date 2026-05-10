@@ -4,7 +4,7 @@ spring:
 
   sql:
     init:
-      mode: never
+      mode: NEVER
       data-locations: classpath:db/data.sql
 
   datasource:
@@ -12,10 +12,13 @@ spring:
     username: "admin"
     password: "admin"
 
+
   jpa:
+    properties:
+     show-sql: true
     hibernate:
-      ddl-auto: update # Options: create, create-drop, update, validate, none
-    show-sql: true
+      ddl-auto: 'update'
+
 
 logging:
   level:

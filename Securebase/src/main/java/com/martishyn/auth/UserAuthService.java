@@ -2,13 +2,24 @@ package com.martishyn.auth;
 
 import com.martishyn.auth.db.Role;
 import com.martishyn.auth.db.RoleRepository;
+import com.martishyn.auth.db.Token;
+import com.martishyn.auth.db.TokenRepository;
 import com.martishyn.auth.db.User;
 import com.martishyn.auth.db.UserAuthRepository;
+import com.martishyn.auth.jwt.JwtPairDto;
 import com.martishyn.auth.jwt.JwtService;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.Principal;
+import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.Optional;
 
 @Service
@@ -16,18 +27,23 @@ public class UserAuthService {
 
     private final UserAuthRepository userAuthRepository;
     private final RoleRepository roleRepository;
-
+    private final TokenRepository tokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final ObjectMapper objectMapper;
 
     public UserAuthService(UserAuthRepository userAuthRepository,
                            RoleRepository roleRepository,
+                           TokenRepository tokenRepository,
                            PasswordEncoder passwordEncoder,
                            JwtService jwtService) {
         this.userAuthRepository = userAuthRepository;
         this.roleRepository = roleRepository;
+        this.tokenRepository = tokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.objectMapper = new ObjectMapper();
+        this.objectMapper.serializationConfig().constructDefaultPrettyPrinter();
     }
 
     @Transactional
@@ -39,7 +55,7 @@ public class UserAuthService {
         userAuthRepository.save(user);
     }
 
-    public String loginUser(LoginUserDto loginUserDto){
+    public JwtPairDto loginUser(LoginUserDto loginUserDto){
         final User userByEmail = userAuthRepository.findUserByEmail(loginUserDto.email())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         final String enteredPassword = loginUserDto.password();
@@ -47,7 +63,49 @@ public class UserAuthService {
         if (!passwordEncoder.matches(enteredPassword, encodedPassword)){
             throw new RuntimeException("Passwords do not match");
         }
-        final String jwtToken = jwtService.issueToken(userByEmail);
-        return jwtToken;
+        final String accessToken = jwtService.issueAccessToken(userByEmail);
+        final String refreshToken = jwtService.issueRefreshToken(userByEmail);
+        JwtPairDto jwtPairDto = new JwtPairDto(accessToken, refreshToken);
+
+        String hashToken;
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            final byte[] hashedToken = messageDigest.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
+            hashToken = Base64.getEncoder().encodeToString(hashedToken);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+        Token createdRefreshToken = new Token(hashToken, LocalDateTime.now().plusDays(7), userByEmail);
+        tokenRepository.save(createdRefreshToken);
+        return jwtPairDto;
+    }
+
+    //user has X tokens, f.e. 1 of them is already expired
+    // we invoke new token -> add new token to the database with the status active
+    // if some of them not revoked -> revoke THEM ???
+    public Optional<String> issueNewRefreshToken(Principal principal, String refreshToken){
+        final String inSessionEmail = principal.getName();
+        final User userByEmail = userAuthRepository.findUserByEmail(inSessionEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        String hashToken;
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            final byte[] hashedToken = messageDigest.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
+            hashToken = Base64.getEncoder().encodeToString(hashedToken);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+
+        final Token existingToken = tokenRepository.findByTokenHashLike(hashToken);
+        existingToken.setRevoked(true);
+        tokenRepository.save(existingToken);
+
+        final String accessToken = jwtService.issueAccessToken(userByEmail);
+        final String newRefreshToken = jwtService.issueRefreshToken(userByEmail);
+        JwtPairDto jwtPairDto = new JwtPairDto(accessToken, newRefreshToken);
+        final String jwtPair = this.objectMapper.writeValueAsString(jwtPairDto);
+
+        tokenRepository.save(new Token(newRefreshToken, LocalDateTime.now().plusDays(7), userByEmail));
+        return Optional.ofNullable(jwtPair);
     }
 }

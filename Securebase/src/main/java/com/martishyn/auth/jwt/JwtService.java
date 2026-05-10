@@ -20,12 +20,22 @@ public class JwtService {
     private static final String JWT_SECRET = "myTopSecretmyTopSecretmyTopSecretmyTopSecretmyTopSecretmyTopSecret";
     private static final String JWT_ISSUER = "martishyn";
 
-    public String issueToken(User userByEmail) {
+    public String issueAccessToken(User userByEmail) {
         return Jwts.builder()
                 .subject(userByEmail.getEmail())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .issuer(JWT_ISSUER)
                 .expiration(Date.from(Instant.now().plus(15, ChronoUnit.MINUTES)))
+                .signWith(getEncryptedKey(), Jwts.SIG.HS256)
+                .compact();
+    }
+
+    public String issueRefreshToken(User userByEmail) {
+        return Jwts.builder()
+                .subject(userByEmail.getEmail())
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .issuer(JWT_ISSUER)
+                .expiration(Date.from(Instant.now().plus(1, ChronoUnit.DAYS)))
                 .signWith(getEncryptedKey(), Jwts.SIG.HS256)
                 .compact();
     }
@@ -40,10 +50,10 @@ public class JwtService {
         return tokenClaims;
     }
 
-    private SecretKey getEncryptedKey(){
-        byte[] encodedSecret = Base64.getDecoder()
-                .decode(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
-       return Keys.hmacShaKeyFor(encodedSecret);
+
+    private SecretKey getEncryptedKey() {
+        byte[] encodedSecret = Base64.getDecoder().decode(JWT_SECRET.getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(encodedSecret);
     }
 
 }
