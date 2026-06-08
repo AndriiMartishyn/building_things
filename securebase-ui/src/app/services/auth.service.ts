@@ -18,7 +18,11 @@ export class AuthService {
   login(email: string, password: string) {
     return this.http.post(`${this.baseUrl}/login`,
       {email, password},
-      {responseType: 'text'})
+      {responseType: 'text', withCredentials: true})
+  }
+
+  refreshToken() {
+    return this.http.post< { accessToken: string }>(`${this.baseUrl}/refresh`, {}, {withCredentials: true});
   }
 
   saveToken(token: string) {

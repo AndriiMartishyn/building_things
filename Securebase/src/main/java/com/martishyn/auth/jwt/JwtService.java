@@ -25,7 +25,7 @@ public class JwtService {
                 .subject(userByEmail.getEmail())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .issuer(JWT_ISSUER)
-                .expiration(Date.from(Instant.now().plus(15, ChronoUnit.MINUTES)))
+                .expiration(Date.from(Instant.now().plus(30, ChronoUnit.SECONDS)))
                 .signWith(getEncryptedKey(), Jwts.SIG.HS256)
                 .compact();
     }
@@ -35,7 +35,7 @@ public class JwtService {
                 .subject(userByEmail.getEmail())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .issuer(JWT_ISSUER)
-                .expiration(Date.from(Instant.now().plus(1, ChronoUnit.DAYS)))
+                .expiration(Date.from(Instant.now().plus(2, ChronoUnit.DAYS)))
                 .signWith(getEncryptedKey(), Jwts.SIG.HS256)
                 .compact();
     }

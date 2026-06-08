@@ -38,7 +38,7 @@ public class SecurityConfiguration {
                         .securityMatcher("/api/v1/**")
                         .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                         .authorizeHttpRequests(authorizeRequests -> {
-                            authorizeRequests.requestMatchers("/api/v1/login", "/api/v1/home", "/api/v1/register").permitAll();
+                            authorizeRequests.requestMatchers("/api/v1/login", "/api/v1/home", "/api/v1/register", "/api/v1/refresh").permitAll();
                             authorizeRequests.anyRequest().authenticated();
                         })
                         .httpBasic(Customizer.withDefaults());

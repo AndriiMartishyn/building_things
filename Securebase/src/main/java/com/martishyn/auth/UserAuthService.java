@@ -8,7 +8,6 @@ import com.martishyn.auth.db.User;
 import com.martishyn.auth.db.UserAuthRepository;
 import com.martishyn.auth.jwt.JwtPairDto;
 import com.martishyn.auth.jwt.JwtService;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -59,14 +59,20 @@ public class UserAuthService {
         final User userByEmail = userAuthRepository.findUserByEmail(loginUserDto.email())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         final String enteredPassword = loginUserDto.password();
-        final String encodedPassword = passwordEncoder.encode(enteredPassword);
-        if (!passwordEncoder.matches(enteredPassword, encodedPassword)){
+        if (!passwordEncoder.matches(enteredPassword,userByEmail.getPassword())) {
             throw new RuntimeException("Passwords do not match");
         }
         final String accessToken = jwtService.issueAccessToken(userByEmail);
         final String refreshToken = jwtService.issueRefreshToken(userByEmail);
         JwtPairDto jwtPairDto = new JwtPairDto(accessToken, refreshToken);
 
+        final String hashToken = hashIssuedToken(refreshToken);
+        Token createdRefreshToken = new Token(hashToken, LocalDateTime.now().plusDays(7), userByEmail);
+        tokenRepository.save(createdRefreshToken);
+        return jwtPairDto;
+    }
+
+    private static String hashIssuedToken(String refreshToken) {
         String hashToken;
         try {
             MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
@@ -75,9 +81,7 @@ public class UserAuthService {
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException(e);
         }
-        Token createdRefreshToken = new Token(hashToken, LocalDateTime.now().plusDays(7), userByEmail);
-        tokenRepository.save(createdRefreshToken);
-        return jwtPairDto;
+        return hashToken;
     }
 
     //user has X tokens, f.e. 1 of them is already expired
@@ -87,25 +91,27 @@ public class UserAuthService {
         final String inSessionEmail = principal.getName();
         final User userByEmail = userAuthRepository.findUserByEmail(inSessionEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        String hashToken;
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-            final byte[] hashedToken = messageDigest.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
-            hashToken = Base64.getEncoder().encodeToString(hashedToken);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
+        final String hashToken = hashIssuedToken(refreshToken);
 
-        final Token existingToken = tokenRepository.findByTokenHashLike(hashToken);
-        existingToken.setRevoked(true);
-        tokenRepository.save(existingToken);
+        final Optional<Token> existingToken = tokenRepository.findByTokenHashLike(hashToken);
+        if (existingToken.isEmpty()) {
+            return Optional.empty();
+        }
+        if (existingToken.get().isRevoked()) {
+            final List<Token> userTokens = tokenRepository.findByUserId(userByEmail.getId());
+            userTokens.forEach(userToken -> {userToken.setRevoked(true);});
+            tokenRepository.saveAll(userTokens);
+            return Optional.empty(); //
+        }
+        existingToken.get().setRevoked(true);
+        tokenRepository.save(existingToken.get());
 
         final String accessToken = jwtService.issueAccessToken(userByEmail);
         final String newRefreshToken = jwtService.issueRefreshToken(userByEmail);
         JwtPairDto jwtPairDto = new JwtPairDto(accessToken, newRefreshToken);
         final String jwtPair = this.objectMapper.writeValueAsString(jwtPairDto);
 
-        tokenRepository.save(new Token(newRefreshToken, LocalDateTime.now().plusDays(7), userByEmail));
+        tokenRepository.save(new Token(hashToken, LocalDateTime.now().plusDays(7), userByEmail));
         return Optional.ofNullable(jwtPair);
     }
 }

@@ -42,8 +42,6 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> authUser(@RequestBody LoginUserDto loginUserDto) {
         final JwtPairDto tokensPair = userAuthService.loginUser(loginUserDto);
-        final String jwtPairRepresentation =
-                this.objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(tokensPair);
         ResponseCookie cookie = ResponseCookie.from("refreshToken", tokensPair.refreshToken())
                 .httpOnly(true) //xss
                 .secure(false) //true for https
@@ -52,7 +50,7 @@ public class AuthController {
                 .build();
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(jwtPairRepresentation);
+                .body(tokensPair.accessToken());
     }
 
     @PostMapping("/refresh")

@@ -8,7 +8,6 @@ import {HttpClient} from '@angular/common/http';
 export class DashboardService {
 
   private dashboardBaseUrl = 'http://localhost:8080/api/v1/dashboard';
-
   constructor(private http: HttpClient) { }
 
    getRolesInfoFromDashBoard() {
