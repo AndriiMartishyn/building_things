@@ -1,4 +1,4 @@
-import {HttpErrorResponse, HttpInterceptorFn, HttpRequest, withInterceptors} from '@angular/common/http';
+import {HttpErrorResponse, HttpInterceptorFn, HttpRequest} from '@angular/common/http';
 import {inject} from '@angular/core';
 import {AuthService} from './auth.service';
 import {catchError, finalize, map, Observable, shareReplay, switchMap, tap, throwError} from 'rxjs';
@@ -34,7 +34,7 @@ let refresh$: Observable<string> | null = null;
 
 /** Routes where Bearer must NOT be attached and where a 401 must NOT trigger a refresh. */
 const AUTH_ROUTES = ['/login', '/register', '/refresh'];
-const isAuthRoute = (url:string) => AUTH_ROUTES.some(() => url.includes(url));
+const isAuthRoute = (url:string) => AUTH_ROUTES.some(route => url.includes(route));
 
 /**
  * Clone a request with an Authorization header.
@@ -87,7 +87,6 @@ export const refreshInterceptor : HttpInterceptorFn = (req, next) => {
       //   - finalize:   clear the slot so the NEXT wave of 401s can
       //                 start a fresh refresh.
       refresh$ ??= authService.refreshToken().pipe(
-        map(r => r.accessToken),
         tap(t => authService.saveToken(t)),
         shareReplay(1),
         finalize(() => {

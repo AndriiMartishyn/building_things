@@ -8,6 +8,7 @@ import com.martishyn.auth.db.User;
 import com.martishyn.auth.db.UserAuthRepository;
 import com.martishyn.auth.jwt.JwtPairDto;
 import com.martishyn.auth.jwt.JwtService;
+import io.jsonwebtoken.Claims;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -87,9 +88,10 @@ public class UserAuthService {
     //user has X tokens, f.e. 1 of them is already expired
     // we invoke new token -> add new token to the database with the status active
     // if some of them not revoked -> revoke THEM ???
-    public Optional<String> issueNewRefreshToken(Principal principal, String refreshToken){
-        final String inSessionEmail = principal.getName();
-        final User userByEmail = userAuthRepository.findUserByEmail(inSessionEmail)
+    public Optional<JwtPairDto> issueNewRefreshToken(String refreshToken){
+        final Claims claims = jwtService.extractTokenClaims(refreshToken);
+        final String userEmailFromToken = claims.getSubject();
+        final User userByEmail = userAuthRepository.findUserByEmail(userEmailFromToken)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         final String hashToken = hashIssuedToken(refreshToken);
 
@@ -101,7 +103,7 @@ public class UserAuthService {
             final List<Token> userTokens = tokenRepository.findByUserId(userByEmail.getId());
             userTokens.forEach(userToken -> {userToken.setRevoked(true);});
             tokenRepository.saveAll(userTokens);
-            return Optional.empty(); //
+            return Optional.empty();
         }
         existingToken.get().setRevoked(true);
         tokenRepository.save(existingToken.get());
@@ -109,9 +111,9 @@ public class UserAuthService {
         final String accessToken = jwtService.issueAccessToken(userByEmail);
         final String newRefreshToken = jwtService.issueRefreshToken(userByEmail);
         JwtPairDto jwtPairDto = new JwtPairDto(accessToken, newRefreshToken);
-        final String jwtPair = this.objectMapper.writeValueAsString(jwtPairDto);
 
-        tokenRepository.save(new Token(hashToken, LocalDateTime.now().plusDays(7), userByEmail));
-        return Optional.ofNullable(jwtPair);
+        final String hashedRefreshToken = hashIssuedToken(newRefreshToken);
+        tokenRepository.save(new Token(hashedRefreshToken, LocalDateTime.now().plusDays(7), userByEmail));
+        return Optional.of(jwtPairDto);
     }
 }

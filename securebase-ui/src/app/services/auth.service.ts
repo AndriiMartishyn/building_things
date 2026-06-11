@@ -22,7 +22,9 @@ export class AuthService {
   }
 
   refreshToken() {
-    return this.http.post< { accessToken: string }>(`${this.baseUrl}/refresh`, {}, {withCredentials: true});
+    return this.http.post(
+      `${this.baseUrl}/refresh`, {},
+      { responseType: 'text', withCredentials: true});
   }
 
   saveToken(token: string) {

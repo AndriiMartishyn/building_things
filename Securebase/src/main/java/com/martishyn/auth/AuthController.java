@@ -1,8 +1,6 @@
 package com.martishyn.auth;
 
 import com.martishyn.auth.jwt.JwtPairDto;
-import com.martishyn.auth.jwt.JwtService;
-import jakarta.servlet.http.Cookie;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -16,7 +14,6 @@ import org.springframework.web.util.UriComponents;
 import org.springframework.web.util.UriComponentsBuilder;
 import tools.jackson.databind.ObjectMapper;
 
-import java.security.Principal;
 import java.util.Optional;
 
 @RestController
@@ -54,10 +51,17 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<String> refreshTokens(Principal principal, @CookieValue("refreshToken") String refreshToken) {
-        Optional<String> tokensPair = userAuthService.issueNewRefreshToken(principal, refreshToken);
-        return tokensPair.map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body("Invalid credentials passed"));
+    public ResponseEntity<?> refreshTokens(@CookieValue("refreshToken") String refreshToken) {
+        final Optional<JwtPairDto> jwtPairDto = userAuthService.issueNewRefreshToken(refreshToken);
+        final Optional<ResponseCookie> responseCookie = jwtPairDto.map(pair -> ResponseCookie.from("refreshToken", jwtPairDto.get().refreshToken())
+                .path("/api/v1/refresh")
+                .secure(false)
+                .httpOnly(true)
+                .sameSite("Strict")
+                .build());
+        return responseCookie.map(cookie -> ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .body(jwtPairDto.get().accessToken()))
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials passed"));
     }
 }
