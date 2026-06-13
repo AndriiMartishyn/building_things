@@ -9,6 +9,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -16,12 +17,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.List;
 
 @Component
 public class JwtFilter extends OncePerRequestFilter {
 
-    @Autowired
-    private UserDetailsService userDetailsService;
     @Autowired
     private JwtService jwtService;
 
@@ -34,10 +34,13 @@ public class JwtFilter extends OncePerRequestFilter {
             Claims claims = null;
             try {
                 claims = jwtService.extractTokenClaims(sanitizedToken);
+                final List<String> existingRoles =  claims.get("roles", List.class);
+                final List<SimpleGrantedAuthority> rolesForSpring = existingRoles.stream()
+                        .map(SimpleGrantedAuthority::new)
+                        .toList();
                 final String userEmail = claims.getSubject();
-                final UserDetails userDetails = userDetailsService.loadUserByUsername(userEmail);
                 UsernamePasswordAuthenticationToken usernamePasswordAuthenticationToken =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                        new UsernamePasswordAuthenticationToken(userEmail, null, rolesForSpring);
                 SecurityContextHolder.getContext().setAuthentication(usernamePasswordAuthenticationToken);
             } catch (ExpiredJwtException e) {
                 SecurityContextHolder.clearContext();

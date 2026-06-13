@@ -1,5 +1,6 @@
 package com.martishyn.auth.jwt;
 
+import com.martishyn.auth.db.Role;
 import com.martishyn.auth.db.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
@@ -13,6 +14,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Date;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class JwtService {
@@ -23,9 +26,10 @@ public class JwtService {
     public String issueAccessToken(User userByEmail) {
         return Jwts.builder()
                 .subject(userByEmail.getEmail())
+                .claim("roles", userByEmail.getRoles().stream().map(Role::getRoleName).toList())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .issuer(JWT_ISSUER)
-                .expiration(Date.from(Instant.now().plus(30, ChronoUnit.SECONDS)))
+                .expiration(Date.from(Instant.now().plus(1, ChronoUnit.MINUTES)))
                 .signWith(getEncryptedKey(), Jwts.SIG.HS256)
                 .compact();
     }
@@ -35,7 +39,7 @@ public class JwtService {
                 .subject(userByEmail.getEmail())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .issuer(JWT_ISSUER)
-                .expiration(Date.from(Instant.now().plus(2, ChronoUnit.DAYS)))
+                .expiration(Date.from(Instant.now().plus(5, ChronoUnit.DAYS)))
                 .signWith(getEncryptedKey(), Jwts.SIG.HS256)
                 .compact();
     }
