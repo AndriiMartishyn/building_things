@@ -12,6 +12,7 @@ import io.jsonwebtoken.Claims;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.CookieValue;
 import tools.jackson.databind.ObjectMapper;
 
 import java.nio.charset.StandardCharsets;
@@ -56,6 +57,7 @@ public class UserAuthService {
         userAuthRepository.save(user);
     }
 
+    @Transactional
     public JwtPairDto loginUser(LoginUserDto loginUserDto){
         final User userByEmail = userAuthRepository.findUserByEmail(loginUserDto.email())
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -73,21 +75,19 @@ public class UserAuthService {
         return jwtPairDto;
     }
 
-    private static String hashIssuedToken(String refreshToken) {
-        String hashToken;
-        try {
-            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
-            final byte[] hashedToken = messageDigest.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
-            hashToken = Base64.getEncoder().encodeToString(hashedToken);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
-        }
-        return hashToken;
+    public void logoutUser(String refreshToken) {
+        final String hashedRefreshToken = hashIssuedToken(refreshToken);
+        tokenRepository.findByTokenHashLike(hashedRefreshToken)
+                        .ifPresent(token -> {
+                            token.setRevoked(true);
+                            tokenRepository.save(token);
+                        });
     }
 
     //user has X tokens, f.e. 1 of them is already expired
     // we invoke new token -> add new token to the database with the status active
     // if some of them not revoked -> revoke THEM ???
+    @Transactional
     public Optional<JwtPairDto> issueNewRefreshToken(String refreshToken){
         final Claims claims = jwtService.extractTokenClaims(refreshToken);
         final String userEmailFromToken = claims.getSubject();
@@ -99,9 +99,10 @@ public class UserAuthService {
         if (existingToken.isEmpty()) {
             return Optional.empty();
         }
+        //probably attacker?
         if (existingToken.get().isRevoked()) {
             final List<Token> userTokens = tokenRepository.findByUserId(userByEmail.getId());
-            userTokens.forEach(userToken -> {userToken.setRevoked(true);});
+            userTokens.forEach(userToken -> userToken.setRevoked(true));
             tokenRepository.saveAll(userTokens);
             return Optional.empty();
         }
@@ -115,5 +116,17 @@ public class UserAuthService {
         final String hashedRefreshToken = hashIssuedToken(newRefreshToken);
         tokenRepository.save(new Token(hashedRefreshToken, LocalDateTime.now().plusDays(7), userByEmail));
         return Optional.of(jwtPairDto);
+    }
+
+    private String hashIssuedToken(String refreshToken) {
+        String hashToken;
+        try {
+            MessageDigest messageDigest = MessageDigest.getInstance("SHA-256");
+            final byte[] hashedToken = messageDigest.digest(refreshToken.getBytes(StandardCharsets.UTF_8));
+            hashToken = Base64.getEncoder().encodeToString(hashedToken);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+        return hashToken;
     }
 }

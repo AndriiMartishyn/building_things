@@ -75,7 +75,7 @@ export const refreshInterceptor : HttpInterceptorFn = (req, next) => {
       // Treat as terminal: clear local state and bounce to /login.
       if (isAuthRoute(req.url)) {
         authService.logout();
-        router.navigate(['/login']).then(() => {});
+        router.navigate(['/login']);
         return throwError(() => err);
       }
 

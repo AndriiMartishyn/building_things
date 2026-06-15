@@ -50,6 +50,25 @@ public class AuthController {
                 .body(tokensPair.accessToken());
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<?> logoutUser(@CookieValue(value = "refreshToken", required = false) String refreshToken) {
+        if (refreshToken != null) {
+            userAuthService.logoutUser(refreshToken);
+        }
+        System.err.println("logoutUser");
+        //removing cookie from browser
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("strict")
+                .path("/api/v1/refresh")
+                .maxAge(0)
+                .build();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build();
+    }
+
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshTokens(@CookieValue("refreshToken") String refreshToken) {
         final Optional<JwtPairDto> jwtPairDto = userAuthService.issueNewRefreshToken(refreshToken);
@@ -59,9 +78,10 @@ public class AuthController {
                 .httpOnly(true)
                 .sameSite("Strict")
                 .build());
-        return responseCookie.map(cookie -> ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, cookie.toString())
-                .body(jwtPairDto.get().accessToken()))
+        return responseCookie.map(cookie ->
+                        ResponseEntity.ok()
+                                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                                .body(jwtPairDto.get().accessToken()))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials passed"));
     }
 }

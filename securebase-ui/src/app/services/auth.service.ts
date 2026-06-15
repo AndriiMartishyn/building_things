@@ -1,5 +1,6 @@
 import {Injectable} from '@angular/core';
 import {HttpClient} from '@angular/common/http';
+import {finalize} from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -35,11 +36,10 @@ export class AuthService {
     return localStorage.getItem('jwt');
   }
 
-  isLoggedIn() {
-    return this.getToken() !== null;
-  }
-
   logout() {
-    localStorage.removeItem('jwt');
+    return this.http.post(
+      `${this.baseUrl}/logout`, {},
+      {withCredentials: true})
+      .pipe(finalize(() => localStorage.removeItem('jwt')));
   }
 }

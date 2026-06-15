@@ -79,8 +79,14 @@ export class DashboardComponent implements OnInit {
     clearInterval(this.timer);
   }
 
-  protected logout(){
-    this.authService.logout();
-    this.router.navigate(['/login']);
+  protected logout() {
+    this.authService.logout().subscribe({
+      next: () => {
+        this.router.navigate(['/login'])
+      },
+      error: () => {
+        this.router.navigate(['/login'])
+      }
+    })
   }
 }
