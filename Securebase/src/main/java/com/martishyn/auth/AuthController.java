@@ -1,6 +1,10 @@
 package com.martishyn.auth;
 
 import com.martishyn.auth.jwt.JwtPairDto;
+import com.martishyn.auth.redis.RedisRateLimiter;
+import com.martishyn.auth.redis.TooManyRequestException;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -22,10 +26,13 @@ public class AuthController {
 
     private final UserAuthService userAuthService;
     private final ObjectMapper objectMapper;
+    @Autowired
+    private final RedisRateLimiter redisRateLimiter;
 
-    public AuthController(UserAuthService userAuthService, ObjectMapper objectMapper) {
+    public AuthController(UserAuthService userAuthService, ObjectMapper objectMapper, RedisRateLimiter redisRateLimiter) {
         this.userAuthService = userAuthService;
         this.objectMapper = objectMapper;
+        this.redisRateLimiter = redisRateLimiter;
         this.objectMapper.serializationConfig().constructDefaultPrettyPrinter();
     }
 
@@ -36,8 +43,25 @@ public class AuthController {
         return ResponseEntity.created(location.toUri()).build();
     }
 
+    //FUNCTION LIMIT_API_CALL(ip)
+    //ts = CURRENT_UNIX_TIME()
+    //keyname = ip+":"+ts
+    //MULTI
+    //    INCR(keyname)
+    //    EXPIRE(keyname,10)
+    //EXEC
+    //current = RESPONSE_OF_INCR_WITHIN_MULTI
+    //IF current > 10 THEN
+    //    ERROR "too many requests per second"
+    //ELSE
+    //    PERFORM_API_CALL()
+    //END
     @PostMapping("/login")
-    public ResponseEntity<?> authUser(@RequestBody LoginUserDto loginUserDto) {
+    public ResponseEntity<?> authUser(@RequestBody LoginUserDto loginUserDto, HttpServletRequest request) throws TooManyRequestException {
+        final boolean isAllowedRequest = redisRateLimiter.isAllowedRequest(request.getRemoteAddr());
+        if (!isAllowedRequest) {
+            throw new TooManyRequestException("Too many requests from 1 user!");
+        }
         final JwtPairDto tokensPair = userAuthService.loginUser(loginUserDto);
         ResponseCookie cookie = ResponseCookie.from("refreshToken", tokensPair.refreshToken())
                 .httpOnly(true) //xss

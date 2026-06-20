@@ -15,5 +15,18 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data # Persists data even if container is deleted
 
+  rateLimiter:
+      image: redis:latest
+      container_name: redis
+      restart: always
+      command: --requirepass test12345 --appendonly yes
+      ports:
+        - 6379:6379
+      volumes:
+        - redis_data:/data
+
 volumes:
   pgdata:
+  redis_data:
+    driver: local
+
