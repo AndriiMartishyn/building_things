@@ -36,7 +36,7 @@ public class User {
     @NotBlank
     private String password;
 
-    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToMany
     @JoinTable(name = "user_role",
             joinColumns = @JoinColumn(name = "user_id"),
             inverseJoinColumns = @JoinColumn(name = "role_id"))
@@ -53,11 +53,6 @@ public class User {
     public void addRole(Role role) {
         roles.add(role);
         role.getUsers().add(this);
-    }
-
-    public void removeRole(Role role) {
-        roles.remove(role);
-        role.getUsers().remove(this);
     }
 
     public Long getId() {

@@ -1,6 +1,7 @@
 package com.martishyn.configuration;
 
 import com.martishyn.auth.jwt.JwtFilter;
+import com.martishyn.auth.redis.RateLimiterFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -29,14 +30,15 @@ import java.util.Arrays;
 public class SecurityConfiguration {
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtFilter jwtFilter) {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtFilter jwtFilter, RateLimiterFilter rateLimiterFilter) {
         final HttpSecurity httpSecurity =
                 http
                         .csrf(AbstractHttpConfigurer::disable)
                         .cors(Customizer.withDefaults())
                         .sessionManagement(httpSecuritySessionManagementConfigurer -> httpSecuritySessionManagementConfigurer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                         .securityMatcher("/api/v1/**")
-                        .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                        .addFilterBefore(rateLimiterFilter, UsernamePasswordAuthenticationFilter.class)
+                        .addFilterAfter(jwtFilter, RateLimiterFilter.class)
                         .authorizeHttpRequests(authorizeRequests -> {
                             authorizeRequests.requestMatchers("/api/v1/login", "/api/v1/register", "/api/v1/refresh", "/api/v1/logout").permitAll();
                             authorizeRequests.anyRequest().authenticated();
