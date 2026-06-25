@@ -12,6 +12,14 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -43,14 +51,44 @@ public class RedisIntegrationTest {
 
     @Test
     public void resetsAfterLimit() throws InterruptedException {
-        String IpAddress = "0.0.0.0";
+        String ipAddress = "0.0.0.0";
         for (int i = 0; i < 10; i++) {
-            Assertions.assertTrue(redisRateLimiter.isAllowedRequest(IpAddress));
+            Assertions.assertTrue(redisRateLimiter.isAllowedRequest(ipAddress));
         }
-        Assertions.assertFalse(redisRateLimiter.isAllowedRequest(IpAddress));
+        Assertions.assertFalse(redisRateLimiter.isAllowedRequest(ipAddress));
         //10 request in 1 second
         //additional request in next second so its ok
         Thread.sleep(1100);
-        Assertions.assertTrue(redisRateLimiter.isAllowedRequest(IpAddress));
+        Assertions.assertTrue(redisRateLimiter.isAllowedRequest(ipAddress));
     }
+
+    @Test
+    public void concurrent_within_same_second_respects_limit() throws InterruptedException {
+        String ipAddress = "0.0.0.0";
+        int threadCount = 50;
+        int limit = 10;
+        ExecutorService pool = Executors.newFixedThreadPool(threadCount);
+        CountDownLatch startGate = new CountDownLatch(1);
+        CountDownLatch endGate = new CountDownLatch(threadCount);
+        AtomicInteger allowed = new AtomicInteger();
+        for (int i = 0; i < threadCount; i++) {
+            pool.submit(() -> {
+                try {
+                    startGate.await();
+                    if (redisRateLimiter.isAllowedRequest(ipAddress)) {
+                        allowed.incrementAndGet();
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                } finally {
+                    endGate.countDown();
+                    ;
+                }
+            });
+        }
+        startGate.countDown();
+        boolean finished = endGate.await(5, TimeUnit.SECONDS);
+        pool.shutdownNow();
+        assertThat(finished).isTrue();
+        assertThat(allowed.get()).isEqualTo(limit);                                                                                                                                                                                                                                              }
 }
