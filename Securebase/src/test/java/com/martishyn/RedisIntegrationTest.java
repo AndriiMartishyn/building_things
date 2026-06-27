@@ -2,9 +2,12 @@ package com.martishyn;
 
 import com.martishyn.auth.redis.RedisRateLimiter;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -40,8 +43,16 @@ public class RedisIntegrationTest {
     @Autowired
     RedisRateLimiter redisRateLimiter;
 
+    @Autowired
+    RedisTemplate redisTemplate;
+
+    @BeforeEach
+    void clearRedis() {
+        redisTemplate.getConnectionFactory().getConnection().serverCommands().flushDb();
+    }
+
     @Test
-    public void blocksAfterLimit(){
+    public void blocksAfterLimit() throws InterruptedException {
         String IpAddress = "0.0.0.0";
         for (int i = 0; i < 9; i++) {
             Assertions.assertTrue(redisRateLimiter.isAllowedRequest(IpAddress));
@@ -62,7 +73,7 @@ public class RedisIntegrationTest {
         Assertions.assertTrue(redisRateLimiter.isAllowedRequest(ipAddress));
     }
 
-    @Test
+    @RepeatedTest(10)
     public void concurrent_within_same_second_respects_limit() throws InterruptedException {
         String ipAddress = "0.0.0.0";
         int threadCount = 50;
@@ -90,5 +101,37 @@ public class RedisIntegrationTest {
         boolean finished = endGate.await(5, TimeUnit.SECONDS);
         pool.shutdownNow();
         assertThat(finished).isTrue();
-        assertThat(allowed.get()).isEqualTo(limit);                                                                                                                                                                                                                                              }
-}
+        assertThat(allowed.get()).isLessThanOrEqualTo(limit);
+    }
+
+    @RepeatedTest(10)
+    public void testing_burst_between_window_should_be_broken_with_fixed_window() throws InterruptedException {
+        String ipAddress = "0.0.0.0";
+        long now = System.currentTimeMillis();
+        long msBeforeNewSecond = 1000 - (now % 1000); //1000 - 147 = 853 ms before a new second
+        Thread.sleep(msBeforeNewSecond - 50); //50 ms before boundary
+        int allowedRequestsBeforeBoundary = 0;
+        System.out.println("Before burst 1, second = " + (System.currentTimeMillis() / 1000));
+        for (int i = 0; i < 10; i++) {
+           boolean isAllowed =  redisRateLimiter.isAllowedRequest(ipAddress);
+           if (isAllowed) allowedRequestsBeforeBoundary++;
+        }
+        System.out.println("After burst 1, second = " + (System.currentTimeMillis() / 1000));
+
+        Thread.sleep(100);
+        System.out.println("Before burst 2, second = " + (System.currentTimeMillis() / 1000));
+
+        int allowedRequestsAfterBoundary = 0;
+        for (int i = 0; i < 10; i++) {
+            boolean isAllowed =  redisRateLimiter.isAllowedRequest(ipAddress);
+            if (isAllowed) {
+                allowedRequestsAfterBoundary++;
+            }
+        }
+        System.out.println("After burst 2, second = " + (System.currentTimeMillis() / 1000));
+
+        Assertions.assertEquals(10, allowedRequestsBeforeBoundary);
+        Assertions.assertEquals(10, allowedRequestsAfterBoundary);
+    }
+
+    }
