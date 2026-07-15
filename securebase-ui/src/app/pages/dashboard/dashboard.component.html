@@ -1,0 +1,28 @@
+<div class="dashboard">
+  <h2>Dashboard</h2>
+
+  <div class="cards">
+
+    <div class="card">
+      <h3>User</h3>
+      <p>{{ email }}</p>
+      <h3>Current roles</h3>
+      <p>{{ currentRoles }}</p>
+    </div>
+
+    <div class="card">
+      <h3>Token Info</h3>
+      <p>Issued at: {{ issuedAt }}</p>
+      <p>Issuer: {{ issuer }}</p>
+    </div>
+
+    <div class="card" [class.danger]="expired">
+      <h3>Session</h3>
+      <p *ngIf="!expired">Expires in: {{ timeLeft }}</p>
+      <p *ngIf="expired">Session expired</p>
+    </div>
+
+  </div>
+
+  <button (click)="logout()">Logout</button>
+</div>

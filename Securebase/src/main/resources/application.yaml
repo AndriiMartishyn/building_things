@@ -1,3 +1,31 @@
 spring:
   application:
     name: Securebase
+
+  sql:
+    init:
+      mode: NEVER
+      data-locations: classpath:db/data.sql
+
+  datasource:
+    url: "jdbc:postgresql://localhost:5432/securebase_db"
+    username: "admin"
+    password: "admin"
+
+
+  jpa:
+    properties:
+     show-sql: true
+    hibernate:
+      ddl-auto: 'update'
+  data:
+    redis:
+      password: test12345
+
+
+logging:
+  level:
+    org:
+      springframework:
+        security: DEBUG
+    io.lettuce: DEBUG
