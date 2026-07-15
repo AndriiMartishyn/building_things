@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -30,6 +32,7 @@ import static org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER
 @DirtiesContext(classMode = AFTER_CLASS)
 public class RedisIntegrationTest {
 
+    private static final Logger log = LoggerFactory.getLogger(RedisIntegrationTest.class);
     @Container
     static GenericContainer<?> redisContainer = new GenericContainer<>("redis:latest")
             .withExposedPorts(6379);
@@ -52,7 +55,7 @@ public class RedisIntegrationTest {
     }
 
     @Test
-    public void blocksAfterLimit() throws InterruptedException {
+    public void blocksAfterLimit() {
         String IpAddress = "0.0.0.0";
         for (int i = 0; i < 9; i++) {
             Assertions.assertTrue(redisRateLimiter.isAllowedRequest(IpAddress));
@@ -134,4 +137,67 @@ public class RedisIntegrationTest {
         Assertions.assertEquals(10, allowedRequestsAfterBoundary);
     }
 
+    @Test
+    public void should_not_pass_request_above_limit_in_window_1_000_ms() throws InterruptedException {
+        String ipAddress = "0.0.0.0";
+        long window = 1000;
+
+        long now = System.currentTimeMillis();
+        long msBeforeNewSecond = 1000 - (now % 1000);
+        Thread.sleep(msBeforeNewSecond - 50); //50 ms before new boundary
+
+        int allowedRequestsBeforeBoundary = 0;
+        for (int i = 0; i < 10; i++) {
+            boolean isAllowed =  redisRateLimiter.isAllowedRequestSlidingWindow(ipAddress, window);
+            if (isAllowed) {
+                allowedRequestsBeforeBoundary++;
+            }
+        }
+
+        Thread.sleep(100);   // cross the wall-clock second boundary
+
+        int allowedAfterBoundary = 0;
+        for (int i = 0; i < 10; i++) {
+            if (redisRateLimiter.isAllowedRequestSlidingWindow(ipAddress, window)) {
+                allowedAfterBoundary++;
+            }
+        }
+
+        // burst 1: 10 fresh requests inside an empty window -> all allowed
+        Assertions.assertEquals(10, allowedRequestsBeforeBoundary);
+        // burst 2: the burst-1 entries are only ~100-150ms old, still inside
+        // the 1s window, so the ZSET already has ~10 entries -> nothing extra allowed
+        Assertions.assertEquals(0, allowedAfterBoundary);
+        // and the whole 200ms span never exceeded the limit
+        assertThat(allowedRequestsBeforeBoundary + allowedAfterBoundary).isLessThanOrEqualTo(10);
     }
+
+    @Test
+    public void should_not_pass_request_above_limit_in_window_10_000_ms() throws InterruptedException {
+        String ipAddress = "0.0.0.0";
+        long window = 10000;
+
+        int countedRequest = 0;
+        for (int i = 0; i < 30; i++) {
+            boolean isAllowed =  redisRateLimiter.isAllowedRequestSlidingWindow(ipAddress, window);
+            if (isAllowed) {
+                countedRequest++;
+            }
+        }
+
+        assertThat(countedRequest).isEqualTo(10);
+
+        Thread.sleep(window + 200);
+
+        int countedReqInNewWindow = 0;
+        for (int i = 0; i < 30; i++) {
+            boolean isAllowed =  redisRateLimiter.isAllowedRequestSlidingWindow(ipAddress, window);
+            if (isAllowed) {
+                countedReqInNewWindow++;
+            }
+        }
+
+        assertThat(countedReqInNewWindow).isEqualTo(10);
+
+    }
+}
